@@ -7,10 +7,11 @@ import cv2
 import json
 import pickle
 import pdb
+import time
 
+model = VGG19(weights='imagenet', include_top=True, pooling='avg')
 
 def encode_image(image):
-    model = VGG19(weights='imagenet', include_top=True, pooling='avg')
     img_em = np.zeros((1, 1000))
 
     im = cv2.resize(cv2.imread(image), (224, 224))
@@ -38,13 +39,20 @@ def main():
     train_df = pd.DataFrame(train_data)
     images_df = train_df[['image_file', 'image_id']]
     images_df = images_df.drop_duplicates('image_id')
+    images_arr = images_df.as_matrix()
     # images_df = images_df.head()
-    images_df['image_em'] = images_df['image_file'].apply(lambda f: encode_image(f))
+    encode_image_vec = np.vectorize(encode_image, otypes=[np.ndarray])
+    batch_size = 100
+
+    for i in range(0, len(images_arr), batch_size):
+        images_arr[i:i+batch_size, 0] = encode_image_vec(images_arr[i:i+batch_size, 0])
+        print('Batch ',i,' complete!')
     
+    images_df = pd.DataFrame(data=images_arr, columns=['image_em', 'image_id'])
     write_to_file(images_df)
 
-    # with h5py.File('vqa_ques_train.h5py', 'r') as hf:
-    #   temp = np.array(hf.get('ques_train'))
+    # # with h5py.File('vqa_ques_train.h5py', 'r') as hf:
+    # #   temp = np.array(hf.get('ques_train'))
     temp = pickle.load(open('vqa_images_train.pkl', 'rb'))
     pdb.set_trace()
 
